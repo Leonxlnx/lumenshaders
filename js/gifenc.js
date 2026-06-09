@@ -186,10 +186,12 @@ var GIFEnc = (function () {
       out.byte(col[0]); out.byte(col[1]); out.byte(col[2]);
     }
 
-    /* NETSCAPE loop forever */
-    out.byte(0x21); out.byte(0xFF); out.byte(11);
-    out.string("NETSCAPE2.0");
-    out.byte(3); out.byte(1); out.short(0); out.byte(0);
+    /* NETSCAPE loop extension: 0 = forever. Omitted entirely -> play once. */
+    if (opts.loop !== false) {
+      out.byte(0x21); out.byte(0xFF); out.byte(11);
+      out.string("NETSCAPE2.0");
+      out.byte(3); out.byte(1); out.short(0); out.byte(0);
+    }
 
     var delay = Math.max(2, Math.round(100 / fps));
     var indices = new Uint8Array(w * h);

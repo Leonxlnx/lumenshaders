@@ -33,8 +33,8 @@ Requires a browser with WebGL2 (Chrome, Edge, Firefox).
 ## Export
 
 - **PNG** up to 3840×2160, rendered offscreen at full quality.
-- **Video** (WebM VP8/VP9) rendered frame-by-frame at 30 fps for 1–4 loops. Uses manual canvas capture instead of realtime 60 fps streaming, which avoids browser crashes on heavy WebGL shaders.
-- **GIF** rendered deterministically frame by frame, encoded in-page with a dependency-free GIF89a encoder (median-cut palette + ordered dithering), infinite loop flag set.
+- **Video** (WebM VP9/VP8) encoded offline with **WebCodecs** (`VideoEncoder`) and muxed by a built-in dependency-free WebM writer — no `MediaRecorder`, no realtime capture, no tab crashes. Configurable fps (24/30/60), resolution (720p–1440p) and exact length (1–8 loops or 5–60 seconds).
+- **GIF** rendered deterministically frame by frame, encoded in-page with a dependency-free GIF89a encoder (median-cut palette + ordered dithering). Loop forever or play once.
 
 ## Files
 
@@ -42,5 +42,6 @@ Requires a browser with WebGL2 (Chrome, Edge, Firefox).
 - `js/shaders.js` — the uber fragment shader with all 9 modes
 - `js/engine.js` — WebGL2 engine and render loop
 - `js/gifenc.js` — GIF encoder (quantizer + LZW)
+- `js/webmmux.js` — WebM/Matroska muxer for WebCodecs output
 - `js/exporter.js` — PNG / video / GIF pipelines
 - `js/palettes.js`, `js/ui.js`, `js/main.js` — palettes, control builders, state and randomizer

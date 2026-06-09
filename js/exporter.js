@@ -54,111 +54,153 @@ var Exporter = (function () {
     }, "image/png");
   }
 
-  /* ---------- Video (deterministic frame capture — avoids captureStream(60) crashes) ---------- */
-  function pickVideoMime() {
-    /* VP8 first: most stable for canvas capture on Chrome/Edge */
+  /* ---------- Video (WebCodecs: deterministic offline encode, no MediaRecorder) ---------- */
+
+  function videoDurationSec(P) {
+    var v = String(P.vidLen || "l2");
+    if (v.charAt(0) === "s") return Math.max(1, parseInt(v.slice(1), 10) || 5);
+    return P.loop * Math.max(1, parseInt(v.slice(1), 10) || 1);
+  }
+
+  function videoBitrate(w, h, fps) {
+    var px = w * h;
+    var base = px >= 2560 * 1440 ? 14000000 : px >= 1920 * 1080 ? 9000000 : px >= 1280 * 720 ? 6000000 : 3500000;
+    return fps >= 60 ? Math.round(base * 1.4) : base;
+  }
+
+  async function pickEncoderConfig(w, h, fps) {
     var candidates = [
-      "video/webm;codecs=vp8",
-      "video/webm;codecs=vp9",
-      "video/webm"
+      { codec: "vp09.00.10.08", codecId: "V_VP9" },
+      { codec: "vp8", codecId: "V_VP8" }
     ];
     for (var i = 0; i < candidates.length; i++) {
-      if (window.MediaRecorder && MediaRecorder.isTypeSupported(candidates[i])) return candidates[i];
+      var cfg = {
+        codec: candidates[i].codec,
+        width: w, height: h,
+        bitrate: videoBitrate(w, h, fps),
+        framerate: fps
+      };
+      try {
+        var sup = await VideoEncoder.isConfigSupported(cfg);
+        if (sup && sup.supported) return { config: cfg, codecId: candidates[i].codecId };
+      } catch (e) { /* try next codec */ }
     }
     return null;
   }
 
-  function recorderOptions(mime, w, h) {
-    var px = w * h;
-    var bps = px >= 1920 * 1080 ? 6000000 : px >= 1280 * 720 ? 4000000 : 2500000;
-    return { mimeType: mime, videoBitsPerSecond: bps };
-  }
-
-  function exportVideo(P, aspect) {
+  async function exportVideo(P, aspect) {
     if (busy) return;
-    if (!window.MediaRecorder) { UI.toast("Video recording not supported in this browser"); return; }
-    var mime = pickVideoMime();
-    if (!mime) { UI.toast("Video recording not supported in this browser"); return; }
+    if (typeof VideoEncoder === "undefined" || typeof VideoFrame === "undefined") {
+      UI.toast("This browser has no WebCodecs support \u2014 use a current Chrome, Edge or Firefox");
+      return;
+    }
     busy = true;
 
     var prev = Engine.size();
     var wasPlaying = Engine.isPlaying();
     var h = parseInt(P.vidRes, 10);
     var w = evenRound(h * aspect);
-    var fps = 30;
-    var loops = parseInt(P.vidLoops, 10) || 1;
-    var totalSec = P.loop * loops;
+    var fps = parseInt(P.vidFps, 10) || 30;
+    var totalSec = videoDurationSec(P);
     var nFrames = Math.max(2, Math.round(totalSec * fps));
-    var frameMs = 1000 / fps;
-    var ext = "webm";
 
+    showOverlay("Rendering video");
     Engine.suspend();
     Engine.setPlaying(false);
     Engine.setSize(w, h);
-    showOverlay("Rendering video");
 
-    var canvas = Engine.canvas();
-    var stream = canvas.captureStream(0);
-    var track = stream.getVideoTracks()[0];
-    var rec;
-    try {
-      rec = new MediaRecorder(stream, recorderOptions(mime, w, h));
-    } catch (err) {
-      try {
-        rec = new MediaRecorder(stream, { mimeType: mime });
-      } catch (err2) {
-        finishVideo(prev, wasPlaying, null, w, h, ext, 0);
-        UI.toast("Video recording failed: " + (err2.message || "unsupported codec"));
-        return;
-      }
+    var picked = await pickEncoderConfig(w, h, fps);
+    if (!picked) {
+      restore();
+      UI.toast("No supported video codec (VP9/VP8) found");
+      return;
     }
 
-    var parts = [];
-    rec.ondataavailable = function (e) { if (e.data && e.data.size) parts.push(e.data); };
-    rec.onerror = function () {
-      cancelled = true;
-      try { rec.stop(); } catch (ignore) {}
-      finishVideo(prev, wasPlaying, null, w, h, ext, totalSec);
-      UI.toast("Video recording failed");
-    };
-    rec.onstop = function () {
-      finishVideo(prev, wasPlaying, parts.length ? new Blob(parts, { type: mime }) : null, w, h, ext, totalSec);
-    };
+    var encFrames = [];
+    var encError = null;
+    var encoder = new VideoEncoder({
+      output: function (chunk) {
+        var data = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(data);
+        encFrames.push({
+          data: data,
+          timestampMs: chunk.timestamp / 1000,
+          key: chunk.type === "key"
+        });
+      },
+      error: function (e) { encError = e; }
+    });
+    encoder.configure(picked.config);
 
-    rec.start(250);
-    var finished = false;
-    captureVideoFrames(0);
+    var canvas = Engine.canvas();
+    var usPerFrame = 1e6 / fps;
 
-    function finishVideo(prevSize, resumePlaying, blob, width, height, extension, seconds) {
-      if (finished) return;
-      finished = true;
-      Engine.setSize(prevSize[0], prevSize[1]);
-      Engine.setPlaying(resumePlaying);
+    try {
+      for (var f = 0; f < nFrames; f++) {
+        if (cancelled || encError) break;
+
+        var t = f / fps;
+        Engine.setLoopTime(t % P.loop);
+        Engine.renderAt((t % P.loop) / P.loop);
+
+        var vf = new VideoFrame(canvas, {
+          timestamp: Math.round(f * usPerFrame),
+          duration: Math.round(usPerFrame)
+        });
+        /* keyframe every 2 seconds keeps files small and seekable */
+        encoder.encode(vf, { keyFrame: f % (fps * 2) === 0 });
+        vf.close();
+
+        setProgress(0.9 * (f + 1) / nFrames,
+          "frame " + (f + 1) + "/" + nFrames + " \u00b7 " + w + "\u00d7" + h + " @ " + fps + "fps");
+
+        /* backpressure: never let the encoder queue grow unbounded */
+        while (encoder.encodeQueueSize > 2) await wait(2);
+        if (f % 8 === 7) await wait(0);
+      }
+
+      if (!cancelled && !encError) {
+        setProgress(0.93, "finalizing encode");
+        await encoder.flush();
+      }
+    } catch (e) {
+      encError = e;
+    }
+
+    try { encoder.close(); } catch (ignore) {}
+
+    /* restore live view before the (fast) muxing step */
+    Engine.setSize(prev[0], prev[1]);
+    Engine.setPlaying(wasPlaying);
+    Engine.resume();
+
+    if (cancelled) { hideOverlay(); busy = false; return; }
+    if (encError || !encFrames.length) {
+      hideOverlay(); busy = false;
+      UI.toast("Video encode failed" + (encError && encError.message ? ": " + encError.message : ""));
+      return;
+    }
+
+    setProgress(0.97, "writing webm container");
+    await wait(0);
+    var webm = WebMMux.mux({
+      codecId: picked.codecId,
+      width: w, height: h,
+      durationMs: totalSec * 1000,
+      frames: encFrames
+    });
+
+    hideOverlay();
+    busy = false;
+    download(new Blob([webm], { type: "video/webm" }), stamp(P, "webm"));
+    UI.toast("Saved " + totalSec.toFixed(1) + "s WEBM \u00b7 " + nFrames + " frames \u00b7 " + w + "\u00d7" + h + " @ " + fps + "fps");
+
+    function restore() {
+      Engine.setSize(prev[0], prev[1]);
+      Engine.setPlaying(wasPlaying);
       Engine.resume();
       hideOverlay();
       busy = false;
-      if (blob && !cancelled) {
-        download(blob, stamp(P, extension));
-        UI.toast("Saved " + seconds.toFixed(1) + "s " + extension.toUpperCase() + " (" + width + "\u00d7" + height + ")");
-      }
-    }
-
-    function captureVideoFrames(f) {
-      if (cancelled || f >= nFrames) {
-        try { rec.stop(); } catch (ignore) {}
-        return;
-      }
-
-      var t = f / fps;
-      var phase = (t % P.loop) / P.loop;
-      Engine.setLoopTime(t % P.loop);
-      Engine.renderAt(phase);
-      if (track && track.requestFrame) track.requestFrame();
-
-      setProgress((f + 1) / nFrames,
-        "frame " + (f + 1) + "/" + nFrames + " \u00b7 " + w + "\u00d7" + h + " @ " + fps + "fps");
-
-      setTimeout(function () { captureVideoFrames(f + 1); }, frameMs);
     }
   }
 
@@ -195,7 +237,7 @@ var Exporter = (function () {
 
     var data = await GIFEnc.encode({
       frames: frames, width: w, height: h, fps: fps,
-      dither: P.gifDither,
+      dither: P.gifDither, loop: P.gifLoop,
       onProgress: function (frac, detail) { setProgress(0.4 + 0.6 * frac, "encoding \u00b7 " + detail); },
       isCancelled: function () { return cancelled; }
     });

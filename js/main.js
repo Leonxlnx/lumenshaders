@@ -36,8 +36,8 @@ var P = {
   grain: 0.05, cell: 90, lines: 56, ca: 0.25, vig: 0.35, soft: 0.95,
   travel: 0.7, loop: 5,
   lockStyle: false,
-  imgRes: "2160", vidRes: "1080", vidLoops: 2,
-  gifW: "640", gifFps: 25, gifDither: true,
+  imgRes: "2160", vidRes: "1080", vidFps: "30", vidLen: "l2",
+  gifW: "640", gifFps: 25, gifDither: true, gifLoop: true,
   aspect: "16:9"
 };
 
@@ -222,10 +222,15 @@ function buildRail() {
   var sExp = UI.section(rail, "Export", null);
   reg(UI.selectRow(sExp, { label: "Image size", options: [["1080", "1920 \u00d7 1080"], ["1440", "2560 \u00d7 1440"], ["2160", "3840 \u00d7 2160"]], get: get("imgRes"), set: set("imgRes") }));
   reg(UI.selectRow(sExp, { label: "Video size", options: [["720", "720p"], ["1080", "1080p"], ["1440", "1440p"]], get: get("vidRes"), set: set("vidRes") }));
-  reg(UI.selectRow(sExp, { label: "Video loops", options: [["1", "1 loop"], ["2", "2 loops"], ["3", "3 loops"], ["4", "4 loops"]], get: function () { return String(P.vidLoops); }, set: function (v) { P.vidLoops = parseInt(v, 10); } }));
+  reg(UI.selectRow(sExp, { label: "Video fps", options: [["24", "24 fps"], ["30", "30 fps"], ["60", "60 fps"]], get: get("vidFps"), set: set("vidFps") }));
+  reg(UI.selectRow(sExp, { label: "Video length", options: [
+    ["l1", "1 loop"], ["l2", "2 loops"], ["l3", "3 loops"], ["l4", "4 loops"], ["l6", "6 loops"], ["l8", "8 loops"],
+    ["s5", "5 seconds"], ["s10", "10 seconds"], ["s15", "15 seconds"], ["s30", "30 seconds"], ["s60", "60 seconds"]
+  ], get: get("vidLen"), set: set("vidLen") }));
   reg(UI.selectRow(sExp, { label: "GIF width", options: [["360", "360 px"], ["480", "480 px"], ["640", "640 px"], ["800", "800 px"]], get: get("gifW"), set: set("gifW") }));
   reg(UI.selectRow(sExp, { label: "GIF fps", options: [["15", "15 fps"], ["20", "20 fps"], ["25", "25 fps"], ["30", "30 fps"]], get: function () { return String(P.gifFps); }, set: function (v) { P.gifFps = parseInt(v, 10); } }));
   reg(UI.toggleRow(sExp, { label: "GIF dithering", get: get("gifDither"), set: set("gifDither") }));
+  reg(UI.toggleRow(sExp, { label: "GIF loop forever", get: get("gifLoop"), set: set("gifLoop") }));
 
   var grid = UI.el("div", "export-grid", sExp);
   UI.exportButton(grid, "Save image", "PNG",
