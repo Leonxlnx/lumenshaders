@@ -465,6 +465,27 @@ select { cursor: pointer; appearance: none; padding-right: 22px;
 .toggle.on { background: var(--text); }
 .toggle.on::after { transform: translateX(13px); background: #0a0a0c; }
 
+/* ---------- share section ---------- */
+
+.share-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.share-row .mini-btn { flex: 1; justify-content: center; }
+.share-input {
+  width: 100%;
+  text-align: left;
+  color: var(--text-mid);
+}
+.share-input::placeholder { color: var(--text-dim); }
+
+/* ---------- share section ---------- */
+
+.share-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.share-row .mini-btn { flex: 1; justify-content: center; }
+.share-input {
+  width: 100%;
+  text-align: left;
+}
+.share-input::placeholder { color: var(--text-dim); }
+
 /* ---------- export section ---------- */
 
 .export-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }

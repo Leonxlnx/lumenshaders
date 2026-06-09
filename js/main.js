@@ -27,14 +27,15 @@ var ASPECTS = { "16:9": 16 / 9, "3:2": 1.5, "1:1": 1, "4:5": 0.8, "21:9": 21 / 9
 
 /* ---------------- state ---------------- */
 
+/* startup: a calm, clean aura on the Halo palette with a fixed seed */
 var P = {
-  mode: 0, seed: Math.floor(Math.random() * 10000),
-  c1: "#e0220a", c2: "#ff5a1f", c3: "#1f8cff", c4: "#bfe7ff", bg: "#050507",
-  hue: 0, sat: 1.2, exposure: 1.0, contrast: 1.15,
-  scale: 1.7, complex: 3.8, warp: 1.1, flow: 0.5, stretch: 0.45,
-  light: 1.6, gloss: 64, lightAngle: 130, irid: 0.55, glow: 0.35,
-  grain: 0.05, cell: 90, lines: 56, ca: 0.25, vig: 0.35, soft: 0.95,
-  travel: 0.7, loop: 5,
+  mode: 3, seed: 1207,
+  c1: "#4a30e0", c2: "#7a8cff", c3: "#e89ab8", c4: "#c2d4ff", bg: "#f4f6ff",
+  hue: 0, sat: 1.0, exposure: 1.0, contrast: 1.0,
+  scale: 1.2, complex: 3.8, warp: 0.5, flow: 0.5, stretch: 0,
+  light: 1.0, gloss: 64, lightAngle: 130, irid: 0.3, glow: 0.15,
+  grain: 0.03, cell: 90, lines: 56, ca: 0, vig: 0, soft: 1.35,
+  travel: 0.6, loop: 6,
   lockStyle: false,
   imgRes: "2160", vidRes: "1080", vidFps: "30", vidLen: "l2",
   gifW: "640", gifFps: 25, gifDither: true, gifLoop: true,
@@ -96,7 +97,7 @@ function rangeFor(key) {
   return rec[key] || DEF_RANGE[key];
 }
 
-var activePreset = 0;
+var activePreset = 11;   /* Halo — matches the startup design */
 var setPresetActive = function () {};
 
 function applyPalette(pal, presetIdx) {
@@ -139,6 +140,67 @@ function randomizeAll() {
   randomizeKeys(FORM_KEYS.concat(LIGHT_KEYS, TEXTURE_KEYS, MOTION_KEYS));
   newSeed();
   refreshAll();
+}
+
+/* ---------------- design codes (share) ---------------- */
+
+var SHARE_NUMS = [
+  "hue", "sat", "exposure", "contrast",
+  "scale", "complex", "warp", "flow", "stretch",
+  "light", "gloss", "lightAngle", "irid", "glow",
+  "grain", "cell", "lines", "ca", "vig", "soft",
+  "travel", "loop"
+];
+
+function encodeDesign() {
+  var arr = [1, P.mode, Math.round(P.seed),
+    P.c1.slice(1), P.c2.slice(1), P.c3.slice(1), P.c4.slice(1), P.bg.slice(1),
+    P.aspect];
+  SHARE_NUMS.forEach(function (k) { arr.push(Math.round(P[k] * 1000) / 1000); });
+  var b64 = btoa(JSON.stringify(arr))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return "LMN1." + b64;
+}
+
+function decodeDesign(code) {
+  try {
+    code = String(code).trim().replace(/^#/, "");
+    if (code.indexOf("LMN1.") !== 0) return false;
+    var b64 = code.slice(5).replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    var arr = JSON.parse(atob(b64));
+    if (!Array.isArray(arr) || arr[0] !== 1 || arr.length !== 9 + SHARE_NUMS.length) return false;
+
+    var hexOk = function (h) { return /^[0-9a-fA-F]{6}$/.test(h); };
+    if (![arr[3], arr[4], arr[5], arr[6], arr[7]].every(hexOk)) return false;
+
+    P.mode = Math.min(Math.max(Math.round(arr[1]) || 0, 0), MODES.length - 1);
+    P.seed = Math.min(Math.max(Math.round(arr[2]) || 0, 0), 9999);
+    P.c1 = "#" + arr[3]; P.c2 = "#" + arr[4]; P.c3 = "#" + arr[5];
+    P.c4 = "#" + arr[6]; P.bg = "#" + arr[7];
+    if (ASPECTS[arr[8]]) P.aspect = arr[8];
+    SHARE_NUMS.forEach(function (k, i) {
+      var v = Number(arr[9 + i]);
+      if (isFinite(v)) P[k] = v;
+    });
+    activePreset = -1;
+    setPresetActive(-1);
+    refreshAll();
+    if (typeof fitCanvas === "function") fitCanvas();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function copyText(text, okMsg) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(
+      function () { UI.toast(okMsg); },
+      function () { UI.toast("Could not access clipboard"); });
+  } else {
+    UI.toast("Clipboard not available in this browser");
+  }
 }
 
 /* ---------------- UI wiring ---------------- */
@@ -217,6 +279,41 @@ function buildRail() {
   var sMotion = UI.section(rail, "Motion", function () { randomizeKeys(MOTION_KEYS); refreshAll(); });
   reg(UI.slider(sMotion, { label: "Loop length", min: 2, max: 12, step: 0.5, fmt: fmtSec, get: get("loop"), set: set("loop") }));
   reg(UI.slider(sMotion, { label: "Travel", min: 0, max: 1.5, step: 0.01, fmt: fmt2, get: get("travel"), set: set("travel") }));
+
+  /* SHARE */
+  var sShare = UI.section(rail, "Share", null);
+  var shareRow = UI.el("div", "share-row", sShare);
+  var btnCopyCode = UI.el("button", "mini-btn", shareRow);
+  btnCopyCode.textContent = "Copy design code";
+  btnCopyCode.addEventListener("click", function () {
+    copyText(encodeDesign(), "Design code copied \u2014 paste it anywhere");
+  });
+  var btnCopyLink = UI.el("button", "mini-btn", shareRow);
+  btnCopyLink.textContent = "Copy link";
+  btnCopyLink.addEventListener("click", function () {
+    var url = location.origin + location.pathname + "#" + encodeDesign();
+    copyText(url, "Share link copied");
+  });
+  var pasteInput = UI.el("input", "num-input mono share-input", sShare);
+  pasteInput.type = "text";
+  pasteInput.placeholder = "Paste a design code\u2026";
+  pasteInput.spellcheck = false;
+  function tryApplyPaste() {
+    var v = pasteInput.value.trim();
+    if (!v) return;
+    if (decodeDesign(v)) {
+      UI.toast("Design loaded");
+      pasteInput.value = "";
+      pasteInput.blur();
+    } else {
+      UI.toast("Invalid design code");
+    }
+  }
+  pasteInput.addEventListener("paste", function () { setTimeout(tryApplyPaste, 0); });
+  pasteInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") tryApplyPaste();
+    e.stopPropagation();
+  });
 
   /* EXPORT */
   var sExp = UI.section(rail, "Export", null);
@@ -301,8 +398,21 @@ document.addEventListener("DOMContentLoaded", function () {
   );
   reg(segRefresh);
 
+  /* load a shared design from the URL hash, e.g. .../#LMN1.xxxx */
+  var hash = decodeURIComponent(location.hash.slice(1) || "");
+  if (hash.indexOf("LMN1.") === 0 && decodeDesign(hash)) {
+    UI.toast("Shared design loaded");
+  }
+
   fitCanvas();
   new ResizeObserver(fitCanvas).observe(document.getElementById("canvas-frame"));
+
+  /* load a shared design from the URL hash, e.g. site/#LMN1.xxxx */
+  if (location.hash.length > 6) {
+    if (decodeDesign(decodeURIComponent(location.hash.slice(1)))) {
+      UI.toast("Shared design loaded");
+    }
+  }
 
   Engine.onFps(function (fps) {
     document.getElementById("meta-fps").textContent = fps + " fps";

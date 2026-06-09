@@ -28,6 +28,7 @@ Requires a browser with WebGL2 (Chrome, Edge, Firefox).
 - **Lighting**: intensity, gloss, light angle, iridescence, glow, contrast.
 - **Texture**: film grain, halftone/glyph density, ridge count, chromatic aberration, vignette, softness.
 - **Motion**: loop length and travel distance. Loops are seamless by construction (the noise field is sampled along a closed circle).
+- **Share**: every design serializes to a compact code (`LMN1.…`). Copy it, send it to anyone, and pasting it into the Share box recreates the exact design — style, colors, seed, all parameters. "Copy link" produces a URL that loads the design directly.
 - `Space` pauses, `S` saves a PNG.
 
 ## Export
