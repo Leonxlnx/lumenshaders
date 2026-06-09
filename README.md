@@ -1,5 +1,7 @@
 # LUMEN — Generative Shader Studio
 
+**[Try it live →](https://leonxlnx.github.io/lumenshaders/)**
+
 A self-contained web tool that generates looping abstract shader art: liquid chrome, silk ribbons, soft gradient blooms, aura rings, light rays, halftone fields, data glyphs, reeded glass and pixel mosaics. Everything is rendered in real time with WebGL2 and every animation is a mathematically perfect loop.
 
 ![Liquid Chrome](docs/preview-chrome.png)
@@ -10,10 +12,10 @@ A self-contained web tool that generates looping abstract shader art: liquid chr
 
 ## Run it
 
-No build step, no dependencies. Either:
+No build step, no dependencies.
 
-- double-click `index.html`, or
-- serve the folder: `npx http-server . -p 8080` and open `http://localhost:8080`
+- **Live demo:** [leonxlnx.github.io/lumenshaders](https://leonxlnx.github.io/lumenshaders/)
+- **Local:** double-click `index.html`, or run `npx http-server . -p 8080`
 
 Requires a browser with WebGL2 (Chrome, Edge, Firefox).
 
