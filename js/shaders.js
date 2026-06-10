@@ -29,6 +29,12 @@ uniform float u_light, u_gloss, u_lightAngle, u_irid, u_glow;
 uniform float u_grain, u_cell, u_lines, u_ca, u_vig, u_soft;
 uniform float u_travel;
 
+/* synth: procedural style combinator */
+uniform int   u_synth;     // 0 = single mode, 1 = blend two modes
+uniform int   u_modeB;
+uniform int   u_mixOp;     // 0 noise mask, 1 screen, 2 multiply, 3 radial, 4 diagonal
+uniform float u_blend;
+
 out vec4 fragColor;
 
 #define TAU 6.28318530718
@@ -404,23 +410,55 @@ vec3 sceneMosaic(vec2 uv){
 
 /* ---------------- dispatch + post ---------------- */
 
-vec3 scene(vec2 uv){
-  if (u_mode == 0) return sceneChrome(uv);
-  if (u_mode == 1) return sceneSilk(uv);
-  if (u_mode == 2) return sceneBloom(uv);
-  if (u_mode == 3) return sceneAura(uv);
-  if (u_mode == 4) return sceneRays(uv);
-  if (u_mode == 5) return sceneHalftone(uv);
-  if (u_mode == 6) return sceneGlyphs(uv);
-  if (u_mode == 7) return sceneReeded(uv);
+vec3 sceneFor(int m, vec2 uv){
+  if (m == 0) return sceneChrome(uv);
+  if (m == 1) return sceneSilk(uv);
+  if (m == 2) return sceneBloom(uv);
+  if (m == 3) return sceneAura(uv);
+  if (m == 4) return sceneRays(uv);
+  if (m == 5) return sceneHalftone(uv);
+  if (m == 6) return sceneGlyphs(uv);
+  if (m == 7) return sceneReeded(uv);
   return sceneMosaic(uv);
+}
+
+vec3 scene(vec2 uv){
+  vec3 a = sceneFor(u_mode, uv);
+  if (u_synth == 0) return a;
+
+  vec3 b = sceneFor(u_modeB, uv);
+  float asp = u_res.x/u_res.y;
+  vec2 c = (uv - 0.5)*vec2(asp, 1.0);
+
+  if (u_mixOp == 1) {                       /* screen: layered light */
+    return mix(a, 1.0 - (1.0 - a)*(1.0 - b), u_blend);
+  }
+  if (u_mixOp == 2) {                       /* multiply with lift */
+    return mix(a, a*b*1.6 + a*0.12, u_blend);
+  }
+  if (u_mixOp == 3) {                       /* radial: B grows from center */
+    float m = smoothstep(0.15, 0.85, length(c)*1.15);
+    return mix(b, a, mix(1.0, m, u_blend));
+  }
+  if (u_mixOp == 4) {                       /* soft diagonal split */
+    float ang = TAU*hash11(u_seed*0.091 + 5.0);
+    float m = smoothstep(-0.45, 0.45, cos(ang)*c.x + sin(ang)*c.y);
+    return mix(a, b, m*u_blend);
+  }
+  /* default: organic noise mask */
+  float m = fbm(c*1.6 + SO()*0.7 + LT()*0.5);
+  m = smoothstep(0.32, 0.68, m);
+  return mix(a, b, m*u_blend);
 }
 
 void main(){
   vec2 uv = gl_FragCoord.xy/u_res;
   vec3 col;
 
-  if (u_ca > 0.004){
+  /* CA re-renders the scene per channel; with synth blending that would
+     inline the full mode dispatch 6 times and break the D3D linker, so
+     aberration only applies to single-mode renders */
+  if (u_ca > 0.004 && u_synth == 0){
     vec2 off = (uv-0.5)*u_ca*0.016;
     col = vec3(scene(uv-off).r, scene(uv).g, scene(uv+off).b);
   } else {

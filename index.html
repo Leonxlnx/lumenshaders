@@ -3,7 +3,17 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>LUMEN — Generative Shader Studio</title>
+<title>LUMEN, the generative shader studio</title>
+<meta name="description" content="Generate looping abstract shader art: liquid chrome, silk, halftone, aura and more. Randomize, fine-tune, share design codes and export PNG, video or GIF." />
+<link rel="icon" type="image/png" sizes="64x64" href="assets/favicon.png" />
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+<meta property="og:title" content="LUMEN, the generative shader studio" />
+<meta property="og:description" content="Looping abstract shader art in your browser. Randomize, fine-tune, share design codes and export PNG, video or GIF. No dependencies." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://leonxlnx.github.io/lumenshaders/" />
+<meta property="og:image" content="https://leonxlnx.github.io/lumenshaders/assets/og.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://leonxlnx.github.io/lumenshaders/assets/og.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -43,6 +53,15 @@
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8 a5.5 5.5 0 1 1 -1.6 -3.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13.8 1.6 V4.4 H11" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
       GIF
     </button>
+    <button class="btn" id="btn-set" title="Generate a consistent set of variations">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+      Set
+    </button>
+    <div class="topbar-divider"></div>
+    <a class="btn btn-ghost" href="docs.html" title="Documentation">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2 H10 L13 5 V14 H3 Z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 7.5 H10.5 M5.5 10 H10.5" stroke="currentColor" stroke-width="1.2"/></svg>
+      Docs
+    </a>
   </div>
 </header>
 
@@ -57,7 +76,7 @@
           <svg id="icon-pause" viewBox="0 0 14 14"><rect x="2.5" y="2" width="3" height="10" rx="1" fill="currentColor"/><rect x="8.5" y="2" width="3" height="10" rx="1" fill="currentColor"/></svg>
           <svg id="icon-play" viewBox="0 0 14 14" style="display:none"><path d="M3.5 2 L12 7 L3.5 12 Z" fill="currentColor"/></svg>
         </button>
-        <span class="meta-item mono" id="meta-mode">—</span>
+        <span class="meta-item mono" id="meta-mode">...</span>
         <span class="meta-sep"></span>
         <span class="meta-item mono dim" id="meta-seed">seed 0000</span>
       </div>
@@ -77,7 +96,7 @@
 <div class="overlay" id="overlay" hidden>
   <div class="overlay-card">
     <div class="overlay-title" id="overlay-title">Rendering</div>
-    <div class="overlay-detail mono" id="overlay-detail">—</div>
+    <div class="overlay-detail mono" id="overlay-detail">...</div>
     <div class="progress"><div class="progress-fill" id="overlay-bar"></div></div>
     <button class="btn overlay-cancel" id="overlay-cancel">Cancel</button>
   </div>
@@ -90,7 +109,9 @@
 <script src="js/engine.js"></script>
 <script src="js/gifenc.js"></script>
 <script src="js/webmmux.js"></script>
+<script src="js/zip.js"></script>
 <script src="js/exporter.js"></script>
+<script src="js/modals.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
 </body>

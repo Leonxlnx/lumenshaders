@@ -36,6 +36,7 @@ var P = {
   light: 1.175, gloss: 44, lightAngle: 235, irid: 0.012, glow: 0.471,
   grain: 0.024, cell: 113, lines: 67, ca: 0.018, vig: 0.079, soft: 1.14,
   travel: 0.72, loop: 7.5,
+  synthOn: false, modeB: 2, mixOp: 0, blend: 0.6,
   lockStyle: false,
   imgRes: "2160", vidRes: "1080", vidFps: "30", vidLen: "l2",
   gifW: "640", gifFps: 25, gifDither: true, gifLoop: true,
@@ -134,13 +135,64 @@ function randomizeKeys(keys) {
 
 function newSeed() { P.seed = Math.floor(rnd() * 10000); }
 
+/* pairs that blend into something coherent instead of mud */
+var SYNTH_PAIRS = [
+  [0, 2], [0, 3], [0, 5], [1, 2], [1, 4], [2, 5], [2, 6], [3, 4],
+  [3, 5], [4, 5], [4, 6], [2, 7], [3, 8], [0, 8], [1, 5], [4, 8]
+];
+
+function generateSynthStyle() {
+  var pair = SYNTH_PAIRS[Math.floor(rnd() * SYNTH_PAIRS.length)];
+  var flip = rnd() < 0.5;
+  P.mode = flip ? pair[1] : pair[0];
+  P.modeB = flip ? pair[0] : pair[1];
+  P.mixOp = Math.floor(rnd() * 5);
+  P.blend = 0.4 + rnd() * 0.55;
+  P.synthOn = true;
+}
+
+function synthName() {
+  return "SYN " + MODES[P.mode].name.slice(0, 3).toUpperCase() + "+" +
+    MODES[P.modeB].name.slice(0, 3).toUpperCase();
+}
+
 function randomizeAll() {
-  if (!P.lockStyle) P.mode = Math.floor(rnd() * MODES.length);
+  if (!P.lockStyle) {
+    if (rnd() < 0.38) {
+      generateSynthStyle();
+    } else {
+      P.synthOn = false;
+      P.mode = Math.floor(rnd() * MODES.length);
+    }
+  }
   randomizePalette();
   randomizeKeys(FORM_KEYS.concat(LIGHT_KEYS, TEXTURE_KEYS, MOTION_KEYS));
   newSeed();
   refreshAll();
 }
+
+/* ---------------- saved styles (localStorage) ---------------- */
+
+var STYLES_KEY = "lumen-styles-v1";
+
+function loadSavedStyles() {
+  try { return JSON.parse(localStorage.getItem(STYLES_KEY)) || []; }
+  catch (e) { return []; }
+}
+function persistSavedStyles(list) {
+  try { localStorage.setItem(STYLES_KEY, JSON.stringify(list)); } catch (e) {}
+}
+function saveCurrentStyle() {
+  var list = loadSavedStyles();
+  var base = P.synthOn ? synthName() : MODES[P.mode].name;
+  var name = base + " " + String(Math.round(P.seed)).padStart(4, "0");
+  list.unshift({ name: name, code: encodeDesign(), ts: Date.now() });
+  if (list.length > 24) list.length = 24;
+  persistSavedStyles(list);
+  renderSavedStyles();
+  UI.toast("Style saved: " + name);
+}
+var renderSavedStyles = function () {};
 
 /* ---------------- design codes (share) ---------------- */
 
@@ -153,10 +205,11 @@ var SHARE_NUMS = [
 ];
 
 function encodeDesign() {
-  var arr = [1, P.mode, Math.round(P.seed),
+  var arr = [2, P.mode, Math.round(P.seed),
     P.c1.slice(1), P.c2.slice(1), P.c3.slice(1), P.c4.slice(1), P.bg.slice(1),
     P.aspect];
   SHARE_NUMS.forEach(function (k) { arr.push(Math.round(P[k] * 1000) / 1000); });
+  arr.push(P.synthOn ? 1 : 0, P.modeB | 0, P.mixOp | 0, Math.round(P.blend * 1000) / 1000);
   var b64 = btoa(JSON.stringify(arr))
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   return "LMN1." + b64;
@@ -169,7 +222,10 @@ function decodeDesign(code) {
     var b64 = code.slice(5).replace(/-/g, "+").replace(/_/g, "/");
     while (b64.length % 4) b64 += "=";
     var arr = JSON.parse(atob(b64));
-    if (!Array.isArray(arr) || arr[0] !== 1 || arr.length !== 9 + SHARE_NUMS.length) return false;
+    var baseLen = 9 + SHARE_NUMS.length;
+    var isV1 = Array.isArray(arr) && arr[0] === 1 && arr.length === baseLen;
+    var isV2 = Array.isArray(arr) && arr[0] === 2 && arr.length === baseLen + 4;
+    if (!isV1 && !isV2) return false;
 
     var hexOk = function (h) { return /^[0-9a-fA-F]{6}$/.test(h); };
     if (![arr[3], arr[4], arr[5], arr[6], arr[7]].every(hexOk)) return false;
@@ -183,6 +239,15 @@ function decodeDesign(code) {
       var v = Number(arr[9 + i]);
       if (isFinite(v)) P[k] = v;
     });
+    if (isV2) {
+      P.synthOn = !!arr[baseLen];
+      P.modeB = Math.min(Math.max(Math.round(arr[baseLen + 1]) || 0, 0), MODES.length - 1);
+      P.mixOp = Math.min(Math.max(Math.round(arr[baseLen + 2]) || 0, 0), 4);
+      var bl = Number(arr[baseLen + 3]);
+      P.blend = isFinite(bl) ? Math.min(Math.max(bl, 0), 1) : 0.6;
+    } else {
+      P.synthOn = false;
+    }
     activePreset = -1;
     setPresetActive(-1);
     refreshAll();
@@ -226,10 +291,56 @@ function buildRail() {
 
   /* STYLE */
   var sStyle = UI.section(rail, "Style", function () {
+    P.synthOn = false;
     P.mode = Math.floor(rnd() * MODES.length);
     refreshAll();
   });
-  reg(UI.modeGrid(sStyle, MODES, get("mode"), function (v) { P.mode = v; updateMeta(); }));
+  reg(UI.modeGrid(sStyle, MODES, function () { return P.synthOn ? -1 : P.mode; },
+    function (v) { P.mode = v; P.synthOn = false; refreshAll(); }));
+
+  /* synth: generated styles */
+  var synthRow = UI.el("div", "share-row synth-row", sStyle);
+  var btnSynth = UI.el("button", "mini-btn", synthRow);
+  btnSynth.innerHTML = '<svg viewBox="0 0 16 16"><path d="M2 8 C4 3 7 13 9 8 C11 3 13 11 14 8" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="2.5" r="1.2" fill="currentColor"/></svg>New synth style';
+  btnSynth.addEventListener("click", function () {
+    generateSynthStyle();
+    newSeed();
+    refreshAll();
+    UI.toast("Generated " + synthName());
+  });
+  var btnSave = UI.el("button", "mini-btn", synthRow);
+  btnSave.innerHTML = '<svg viewBox="0 0 16 16"><path d="M3 2 H11 L14 5 V14 H3 Z" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="5.5" y="9" width="5" height="4" fill="currentColor"/></svg>Save style';
+  btnSave.addEventListener("click", saveCurrentStyle);
+
+  var synthCtl = UI.el("div", "synth-ctl", sStyle);
+  reg(UI.slider(synthCtl, { label: "Synth blend", min: 0, max: 1, step: 0.01, fmt: fmt2,
+    get: get("blend"), set: function (v) { P.blend = v; updateMeta(); } }));
+  reg(function () { synthCtl.style.display = P.synthOn ? "" : "none"; });
+
+  var savedWrap = UI.el("div", "saved-styles", sStyle);
+  renderSavedStyles = function () {
+    savedWrap.innerHTML = "";
+    var list = loadSavedStyles();
+    list.forEach(function (st, i) {
+      var chip = UI.el("button", "saved-chip", savedWrap);
+      var label = UI.el("span", null, chip);
+      label.textContent = st.name;
+      var del = UI.el("span", "saved-del", chip);
+      del.innerHTML = "&times;";
+      del.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        var l = loadSavedStyles();
+        l.splice(i, 1);
+        persistSavedStyles(l);
+        renderSavedStyles();
+      });
+      chip.addEventListener("click", function () {
+        if (decodeDesign(st.code)) UI.toast("Loaded " + st.name);
+      });
+    });
+  };
+  renderSavedStyles();
+
   reg(UI.lockRow(sStyle, { label: "Keep style when randomizing", get: get("lockStyle"), set: set("lockStyle") }));
 
   /* COLOR */
@@ -286,7 +397,7 @@ function buildRail() {
   var btnCopyCode = UI.el("button", "mini-btn", shareRow);
   btnCopyCode.textContent = "Copy design code";
   btnCopyCode.addEventListener("click", function () {
-    copyText(encodeDesign(), "Design code copied \u2014 paste it anywhere");
+    copyText(encodeDesign(), "Design code copied, paste it anywhere");
   });
   var btnCopyLink = UI.el("button", "mini-btn", shareRow);
   btnCopyLink.textContent = "Copy link";
@@ -315,36 +426,28 @@ function buildRail() {
     e.stopPropagation();
   });
 
-  /* EXPORT */
+  /* EXPORT: buttons open a dialog with preview and settings */
   var sExp = UI.section(rail, "Export", null);
-  reg(UI.selectRow(sExp, { label: "Image size", options: [["1080", "1920 \u00d7 1080"], ["1440", "2560 \u00d7 1440"], ["2160", "3840 \u00d7 2160"]], get: get("imgRes"), set: set("imgRes") }));
-  reg(UI.selectRow(sExp, { label: "Video size", options: [["720", "720p"], ["1080", "1080p"], ["1440", "1440p"]], get: get("vidRes"), set: set("vidRes") }));
-  reg(UI.selectRow(sExp, { label: "Video fps", options: [["24", "24 fps"], ["30", "30 fps"], ["60", "60 fps"]], get: get("vidFps"), set: set("vidFps") }));
-  reg(UI.selectRow(sExp, { label: "Video length", options: [
-    ["l1", "1 loop"], ["l2", "2 loops"], ["l3", "3 loops"], ["l4", "4 loops"], ["l6", "6 loops"], ["l8", "8 loops"],
-    ["s5", "5 seconds"], ["s10", "10 seconds"], ["s15", "15 seconds"], ["s30", "30 seconds"], ["s60", "60 seconds"]
-  ], get: get("vidLen"), set: set("vidLen") }));
-  reg(UI.selectRow(sExp, { label: "GIF width", options: [["360", "360 px"], ["480", "480 px"], ["640", "640 px"], ["800", "800 px"]], get: get("gifW"), set: set("gifW") }));
-  reg(UI.selectRow(sExp, { label: "GIF fps", options: [["15", "15 fps"], ["20", "20 fps"], ["25", "25 fps"], ["30", "30 fps"]], get: function () { return String(P.gifFps); }, set: function (v) { P.gifFps = parseInt(v, 10); } }));
-  reg(UI.toggleRow(sExp, { label: "GIF dithering", get: get("gifDither"), set: set("gifDither") }));
-  reg(UI.toggleRow(sExp, { label: "GIF loop forever", get: get("gifLoop"), set: set("gifLoop") }));
-
   var grid = UI.el("div", "export-grid", sExp);
-  UI.exportButton(grid, "Save image", "PNG",
+  UI.exportButton(grid, "Image", "PNG",
     '<svg viewBox="0 0 16 16"><rect x="1.5" y="1.5" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="5.5" cy="5.5" r="1.5" fill="currentColor"/><path d="M2 12 L6 8 L9 11 L11.5 8.5 L14 11" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
-    function () { Exporter.exportPNG(P, ASPECTS[P.aspect]); });
-  UI.exportButton(grid, "Record video", "WEBM",
+    function () { Modals.openExport("png"); });
+  UI.exportButton(grid, "Video", "WEBM",
     '<svg viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="9" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 7 L14.5 4.5 V11.5 L10.5 9" fill="currentColor"/></svg>',
-    function () { Exporter.exportVideo(P, ASPECTS[P.aspect]); });
-  UI.exportButton(grid, "Render loop GIF", "GIF",
+    function () { Modals.openExport("video"); });
+  UI.exportButton(grid, "Looping GIF", "GIF",
     '<svg viewBox="0 0 16 16"><path d="M13.5 8 a5.5 5.5 0 1 1 -1.6 -3.9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13.8 1.6 V4.4 H11" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
-    function () { Exporter.exportGIF(P, ASPECTS[P.aspect]); });
+    function () { Modals.openExport("gif"); });
+  UI.exportButton(grid, "Gradient set", "ZIP",
+    '<svg viewBox="0 0 16 16"><rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="1.5" width="5.5" height="5.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="1.5" y="9" width="5.5" height="5.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="9" width="5.5" height="5.5" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>',
+    function () { Modals.openSetGenerator(); });
 }
 
 /* ---------------- stage / meta ---------------- */
 
 function updateMeta() {
-  document.getElementById("meta-mode").textContent = MODES[P.mode].full;
+  document.getElementById("meta-mode").textContent =
+    P.synthOn ? synthName() : MODES[P.mode].full;
   document.getElementById("meta-seed").textContent = "seed " + String(Math.round(P.seed)).padStart(4, "0");
   document.getElementById("meta-loop").textContent = P.loop.toFixed(1) + "s loop";
   var s = Engine.size();
@@ -414,6 +517,20 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  /* intro: elements pop in big and settle into place, one after another */
+  (function intro() {
+    var items = [];
+    document.querySelectorAll(".topbar > *").forEach(function (n) { items.push(n); });
+    items.push(document.querySelector(".canvas-frame"));
+    items.push(document.querySelector(".stage-meta"));
+    document.querySelectorAll(".rail-section").forEach(function (n) { items.push(n); });
+    items.forEach(function (n, i) {
+      if (n) n.style.setProperty("--intro-d", (i * 65) + "ms");
+    });
+    document.body.classList.add("intro");
+    setTimeout(function () { document.body.classList.remove("intro"); }, items.length * 65 + 1100);
+  })();
+
   Engine.onFps(function (fps) {
     document.getElementById("meta-fps").textContent = fps + " fps";
   });
@@ -422,9 +539,10 @@ document.addEventListener("DOMContentLoaded", function () {
   document.getElementById("btn-play").addEventListener("click", function () {
     setPlayingUI(!Engine.isPlaying());
   });
-  document.getElementById("btn-export-png").addEventListener("click", function () { Exporter.exportPNG(P, ASPECTS[P.aspect]); });
-  document.getElementById("btn-export-video").addEventListener("click", function () { Exporter.exportVideo(P, ASPECTS[P.aspect]); });
-  document.getElementById("btn-export-gif").addEventListener("click", function () { Exporter.exportGIF(P, ASPECTS[P.aspect]); });
+  document.getElementById("btn-export-png").addEventListener("click", function () { Modals.openExport("png"); });
+  document.getElementById("btn-export-video").addEventListener("click", function () { Modals.openExport("video"); });
+  document.getElementById("btn-export-gif").addEventListener("click", function () { Modals.openExport("gif"); });
+  document.getElementById("btn-set").addEventListener("click", function () { Modals.openSetGenerator(); });
 
   document.addEventListener("keydown", function (e) {
     var tag = (e.target.tagName || "").toLowerCase();

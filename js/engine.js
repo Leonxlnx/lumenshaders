@@ -17,7 +17,8 @@ var Engine = (function () {
     "u_scale", "u_complex", "u_warp", "u_flow", "u_stretch",
     "u_light", "u_gloss", "u_lightAngle", "u_irid", "u_glow",
     "u_grain", "u_cell", "u_lines", "u_ca", "u_vig", "u_soft",
-    "u_travel"
+    "u_travel",
+    "u_synth", "u_modeB", "u_mixOp", "u_blend"
   ];
 
   function compile(type, src) {
@@ -106,6 +107,11 @@ var Engine = (function () {
     gl.uniform1f(uniforms.u_soft, P.soft);
 
     gl.uniform1f(uniforms.u_travel, P.travel);
+
+    gl.uniform1i(uniforms.u_synth, P.synthOn ? 1 : 0);
+    gl.uniform1i(uniforms.u_modeB, P.modeB | 0);
+    gl.uniform1i(uniforms.u_mixOp, P.mixOp | 0);
+    gl.uniform1f(uniforms.u_blend, P.blend);
   }
 
   function renderAt(phase) {

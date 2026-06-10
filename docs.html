@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Docs, LUMEN generative shader studio</title>
+<meta name="description" content="How to use LUMEN: styles, synth styles, color, motion, share codes, gradient sets and exporting PNG, video or GIF." />
+<link rel="icon" type="image/png" sizes="64x64" href="assets/favicon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  body { overflow: auto; }
+  .docs-wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 48px 24px 110px;
+  }
+  .docs-hero {
+    margin-bottom: 44px;
+  }
+  .docs-hero h1 {
+    font-family: var(--font-display);
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    margin-bottom: 10px;
+  }
+  .docs-hero p { color: var(--text-mid); font-size: 14px; line-height: 1.65; max-width: 56ch; }
+  .docs-hero .btn { margin-top: 18px; }
+  .docs-section { margin-bottom: 38px; }
+  .docs-section h2 {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .docs-section p, .docs-section li {
+    font-size: 13.5px;
+    line-height: 1.7;
+    color: var(--text-mid);
+  }
+  .docs-section p + p { margin-top: 8px; }
+  .docs-section ul { padding-left: 18px; margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+  .docs-section strong { color: var(--text); font-weight: 600; }
+  .docs-section code {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    background: var(--bg-raised);
+    border: 1px solid var(--line-soft);
+    padding: 1.5px 6px;
+    border-radius: 6px;
+    color: var(--text);
+  }
+  .kbd {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03));
+    border: 1px solid var(--line);
+    box-shadow: inset 0 -1.5px 0 rgba(0,0,0,0.4);
+    padding: 2px 7px;
+    border-radius: 6px;
+    color: var(--text);
+  }
+  .docs-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  .docs-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 13px;
+    color: var(--text-mid);
+    vertical-align: top;
+  }
+  .docs-table td:first-child { color: var(--text); font-weight: 500; white-space: nowrap; width: 140px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M10 1 L19 10 L10 19 L1 10 Z" fill="none" stroke="currentColor" stroke-width="1.4"/>
+      <path d="M10 5.5 L14.5 10 L10 14.5 L5.5 10 Z" fill="currentColor"/>
+    </svg>
+    <span class="brand-name">LUMEN</span>
+    <span class="brand-sub">documentation</span>
+  </div>
+  <div class="topbar-actions">
+    <a class="btn btn-primary" href="index.html">Open the studio</a>
+  </div>
+</header>
+
+<div class="docs-wrap">
+  <div class="docs-hero">
+    <h1>How LUMEN works</h1>
+    <p>LUMEN generates looping abstract shader art in your browser: liquid chrome, silk, soft gradients, halftone fields and more. Everything renders in real time with WebGL2, every animation is a perfect loop, and everything you make can be exported or shared as a code.</p>
+  </div>
+
+  <div class="docs-section">
+    <h2>Styles</h2>
+    <p>Pick one of the 9 base styles in the <strong>Style</strong> section: Chrome, Silk, Bloom, Aura, Rays, Halftone, Glyphs, Reeded and Mosaic. Each one is its own renderer with its own character.</p>
+    <p><strong>Synth styles</strong> go beyond the base set: <code>New synth style</code> blends two renderers with a random mix operation (organic mask, screen, multiply, radial or diagonal split) into a completely new look. The <strong>Synth blend</strong> slider controls how strongly the second layer shows. The big <strong>Randomize</strong> button also produces synth styles some of the time.</p>
+    <p>Found something you love? <code>Save style</code> stores it in your browser. Saved styles appear as chips you can reload with one click, and they survive page reloads.</p>
+  </div>
+
+  <div class="docs-section">
+    <h2>Color</h2>
+    <ul>
+      <li><strong>Presets:</strong> 16 curated palettes tuned for the renderers.</li>
+      <li><strong>Swatches A to D:</strong> the four palette colors every style draws from, plus <strong>BG</strong> for the background.</li>
+      <li><strong>Hue shift, saturation, exposure:</strong> grade the final image without touching the palette.</li>
+      <li>The dice in the section header rolls a new harmonised palette that fits the current style.</li>
+    </ul>
+  </div>
+
+  <div class="docs-section">
+    <h2>Form, lighting, texture, motion</h2>
+    <table class="docs-table">
+      <tr><td>Seed</td><td>Every design is deterministic. Same seed, same image. Type a number or roll a new one.</td></tr>
+      <tr><td>Zoom / Detail</td><td>Size of the forms and the number of noise octaves.</td></tr>
+      <tr><td>Warp / Turbulence</td><td>How much the field folds into itself and how much it churns while moving.</td></tr>
+      <tr><td>Stretch</td><td>Anisotropy. Positive stretches horizontally, negative vertically.</td></tr>
+      <tr><td>Lighting</td><td>Intensity, gloss tightness, light angle, iridescence and bloom glow.</td></tr>
+      <tr><td>Texture</td><td>Film grain, halftone and glyph density, ridge count, chromatic aberration, vignette, softness.</td></tr>
+      <tr><td>Loop length</td><td>Duration of one seamless cycle, 2 to 12 seconds.</td></tr>
+      <tr><td>Travel</td><td>How far the field moves during one loop.</td></tr>
+    </table>
+  </div>
+
+  <div class="docs-section">
+    <h2>Share codes</h2>
+    <p>Every design serializes to a compact code starting with <code>LMN1.</code> It contains the style, all five colors, the seed and every parameter.</p>
+    <ul>
+      <li><strong>Copy design code</strong> puts the code on your clipboard. Anyone can paste it into the Share box to get the exact same design.</li>
+      <li><strong>Copy link</strong> creates a URL with the code in the hash. Opening it loads the design directly.</li>
+    </ul>
+  </div>
+
+  <div class="docs-section">
+    <h2>Gradient sets</h2>
+    <p>The <strong>Set</strong> button generates 4 to 12 variations of your current design that share the style, palette and all settings but use different seeds. They look like one family, which makes them perfect for a website: one for the hero, others for cards or section backgrounds.</p>
+    <p>Click a tile to apply that seed to the editor, or download the whole set as a ZIP of PNGs in one click.</p>
+  </div>
+
+  <div class="docs-section">
+    <h2>Export</h2>
+    <p>Each export button opens a dialog with a live preview and its settings, then downloads on confirm.</p>
+    <table class="docs-table">
+      <tr><td>PNG</td><td>Stills up to 3840 x 2160, rendered offscreen at full quality.</td></tr>
+      <tr><td>WebM video</td><td>Encoded offline with WebCodecs, VP9 or VP8, muxed by a built-in WebM writer. 24, 30 or 60 fps, exact length in loops or seconds.</td></tr>
+      <tr><td>GIF</td><td>Frame-exact seamless loop, encoded in-page with a dependency-free GIF89a encoder. Optional dithering, loop forever or play once.</td></tr>
+    </table>
+    <p>Loops are seamless by construction: the noise field is sampled along a closed circle, so the last frame flows exactly into the first.</p>
+  </div>
+
+  <div class="docs-section">
+    <h2>Shortcuts</h2>
+    <table class="docs-table">
+      <tr><td><span class="kbd">R</span></td><td>Randomize everything</td></tr>
+      <tr><td><span class="kbd">Space</span></td><td>Play or pause</td></tr>
+      <tr><td><span class="kbd">S</span></td><td>Save a PNG with current settings</td></tr>
+    </table>
+  </div>
+
+  <div class="docs-section">
+    <h2>Tech notes</h2>
+    <p>LUMEN is a static page with zero dependencies: one WebGL2 uber-shader, a hand-written GIF encoder, a WebM muxer and a store-only ZIP writer. The source is on <a href="https://github.com/Leonxlnx/lumenshaders" style="color: var(--text);">GitHub</a> under the MIT license.</p>
+  </div>
+</div>
+
+</body>
+</html>

@@ -91,7 +91,7 @@ var Exporter = (function () {
   async function exportVideo(P, aspect) {
     if (busy) return;
     if (typeof VideoEncoder === "undefined" || typeof VideoFrame === "undefined") {
-      UI.toast("This browser has no WebCodecs support \u2014 use a current Chrome, Edge or Firefox");
+      UI.toast("This browser has no WebCodecs support, use a current Chrome, Edge or Firefox");
       return;
     }
     busy = true;
