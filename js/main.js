@@ -479,11 +479,13 @@ function updateMeta() {
   document.getElementById("meta-mode").textContent = styleName();
   document.getElementById("meta-seed").textContent = "seed " + String(Math.round(P.seed)).padStart(4, "0");
   document.getElementById("meta-loop").textContent = P.loop.toFixed(1) + "s loop";
-  var s = Engine.size();
-  document.getElementById("meta-res").textContent = s[0] + "\u00d7" + s[1];
+  if (Engine.isReady()) {
+    var s = Engine.size();
+    document.getElementById("meta-res").textContent = s[0] + "\u00d7" + s[1];
+  }
 }
 
-function fitCanvas() {
+function fitCanvas(preview) {
   var frame = document.getElementById("canvas-frame");
   var availW = frame.clientWidth - 80;
   var availH = frame.clientHeight - 52;
@@ -491,10 +493,19 @@ function fitCanvas() {
   var ar = ASPECTS[P.aspect];
   var w = availW, h = w / ar;
   if (h > availH) { h = availH; w = h * ar; }
-  var canvas = Engine.canvas();
-  canvas.style.width = Math.round(w) + "px";
-  canvas.style.height = Math.round(h) + "px";
-  var dpr = Math.min(window.devicePixelRatio || 1, 1.35);
+  w = Math.round(w);
+  h = Math.round(h);
+  var canvasEl = document.getElementById("view");
+  canvasEl.style.width = w + "px";
+  canvasEl.style.height = h + "px";
+  var boot = document.getElementById("canvas-boot");
+  if (boot) {
+    boot.style.width = w + "px";
+    boot.style.height = h + "px";
+  }
+  if (!Engine.isReady()) return;
+  var dprCap = preview ? 0.75 : 1.35;
+  var dpr = Math.min(window.devicePixelRatio || 1, dprCap);
   Engine.setSize(2 * Math.round(w * dpr / 2), 2 * Math.round(h * dpr / 2));
   updateMeta();
 }
@@ -507,21 +518,35 @@ function setPlayingUI(v) {
 
 /* ---------------- boot ---------------- */
 
-document.addEventListener("DOMContentLoaded", function () {
-  var canvas = document.getElementById("view");
-  try {
-    Engine.init(canvas, function () { return P; });
-  } catch (e) {
-    document.querySelector(".canvas-frame").innerHTML =
-      '<div style="color:#9b9ba4;font-size:13px;max-width:380px;text-align:center;line-height:1.6">' +
-      "WebGL2 is required. Please use a recent Chrome, Edge or Firefox.<br><span style=\"color:#5e5e68;font-size:11px\">" +
-      String(e.message).split("\n")[0] + "</span></div>";
-    return;
-  }
+function runIntro() {
+  var items = [];
+  document.querySelectorAll(".brand, .segmented button, .topbar-actions > *").forEach(function (n) {
+    items.push(n);
+  });
+  items.push(document.getElementById("canvas-shell"));
+  items.push(document.querySelector(".stage-meta"));
+  document.querySelectorAll(".rail-section").forEach(function (n) { items.push(n); });
+  document.querySelectorAll(".mode-grid > *, .export-grid > *").forEach(function (n) { items.push(n); });
 
-  buildRail();
+  var d = 0;
+  items.forEach(function (n, i) {
+    if (!n) return;
+    d += i < 10 ? 40 : 24;
+    n.classList.add("stagger-item");
+    n.style.setProperty("--intro-d", Math.min(d, 820) + "ms");
+  });
+  document.body.classList.add("intro");
+  setTimeout(function () {
+    document.body.classList.remove("intro");
+    items.forEach(function (n) {
+      if (!n) return;
+      n.classList.remove("stagger-item");
+      n.style.removeProperty("--intro-d");
+    });
+  }, 1500);
+}
 
-  /* aspect segmented control */
+function wireControls() {
   var segRefresh = UI.segmented(
     document.getElementById("aspect-seg"),
     Object.keys(ASPECTS).map(function (k) { return [k, k]; }),
@@ -529,61 +554,6 @@ document.addEventListener("DOMContentLoaded", function () {
     function (v) { P.aspect = v; fitCanvas(); }
   );
   reg(segRefresh);
-
-  /* load a shared design from the URL hash, e.g. .../#LMN1.xxxx */
-  var hash = decodeURIComponent(location.hash.slice(1) || "");
-  if (hash.indexOf("LMN1.") === 0 && decodeDesign(hash)) {
-    UI.toast("Shared design loaded");
-  }
-
-  fitCanvas();
-  new ResizeObserver(fitCanvas).observe(document.getElementById("canvas-frame"));
-
-  /* load a shared design from the URL hash, e.g. site/#LMN1.xxxx */
-  if (location.hash.length > 6) {
-    if (decodeDesign(decodeURIComponent(location.hash.slice(1)))) {
-      UI.toast("Shared design loaded");
-    }
-  }
-
-  /* intro: every element pops in big and settles into place,
-     one after another. transform/opacity only, fully compositor-driven. */
-  (function intro() {
-    var items = [];
-    document.querySelectorAll(".brand, .segmented button, .topbar-actions > *").forEach(function (n) { items.push(n); });
-    items.push(document.querySelector(".canvas-frame"));
-    items.push(document.querySelector(".stage-meta"));
-    document.querySelectorAll(".rail-section").forEach(function (sec) {
-      Array.prototype.forEach.call(sec.children, function (child) {
-        if (child.classList.contains("mode-grid") ||
-            child.classList.contains("preset-row") ||
-            child.classList.contains("export-grid")) {
-          Array.prototype.forEach.call(child.children, function (n) { items.push(n); });
-        } else {
-          items.push(child);
-        }
-      });
-    });
-
-    var d = 0;
-    items.forEach(function (n, i) {
-      if (!n) return;
-      /* fast cadence inside the rail, slower for the hero pieces */
-      d += i < 12 ? 50 : 16;
-      n.classList.add("stagger-item");
-      n.style.setProperty("--intro-d", Math.min(d, 2100) + "ms");
-    });
-    document.body.classList.add("intro");
-    setTimeout(function () {
-      document.body.classList.remove("intro");
-      items.forEach(function (n) {
-        if (!n) return;
-        n.classList.remove("stagger-item");
-        n.style.removeProperty("--intro-d");
-        n.style.willChange = "auto";
-      });
-    }, 3000);
-  })();
 
   Engine.onFps(function (fps) {
     document.getElementById("meta-fps").textContent = fps + " fps";
@@ -605,6 +575,59 @@ document.addEventListener("DOMContentLoaded", function () {
     else if (e.key === "r" || e.key === "R") { randomizeAll(); }
     else if (e.key === "s" || e.key === "S") { Exporter.exportPNG(P, ASPECTS[P.aspect]); }
   });
+}
 
-  updateMeta();
+function showBootError(msg) {
+  document.body.classList.remove("booting");
+  document.querySelector(".canvas-frame").innerHTML =
+    '<div style="color:#9b9ba4;font-size:13px;max-width:380px;text-align:center;line-height:1.6">' +
+    "WebGL2 is required. Please use a recent Chrome, Edge or Firefox.<br><span style=\"color:#5e5e68;font-size:11px\">" +
+    String(msg).split("\n")[0] + "</span></div>";
+}
+
+function finishBoot(opts) {
+  document.body.classList.remove("booting");
+  document.body.classList.add("ready");
+  Engine.start();
+  if (opts.intro) runIntro();
+  setTimeout(function () { fitCanvas(false); }, 1400);
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  var canvas = document.getElementById("view");
+  var lowPower = (navigator.hardwareConcurrency || 8) <= 4 ||
+    ((navigator.deviceMemory || 8) <= 4);
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  requestAnimationFrame(function () {
+    fitCanvas(true);
+    buildRail();
+    wireControls();
+
+    var hash = decodeURIComponent(location.hash.slice(1) || "");
+    if (hash.indexOf("LMN1.") === 0 && decodeDesign(hash)) {
+      UI.toast("Shared design loaded");
+    }
+
+    new ResizeObserver(function () {
+      fitCanvas(!document.body.classList.contains("ready"));
+    }).observe(document.getElementById("canvas-frame"));
+
+    requestAnimationFrame(function () {
+      try {
+        Engine.init(canvas, function () { return P; }, { autostart: false });
+      } catch (e) {
+        showBootError(e.message);
+        return;
+      }
+
+      fitCanvas(true);
+      Engine.renderAt(0);
+
+      requestAnimationFrame(function () {
+        finishBoot({ intro: !lowPower && !reduceMotion });
+        updateMeta();
+      });
+    });
+  });
 });

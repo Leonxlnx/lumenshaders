@@ -11,16 +11,23 @@
 <meta property="og:description" content="Looping abstract shader art in your browser. Randomize, fine-tune, share design codes and export PNG, video or GIF. No dependencies." />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://lumenshaders.vercel.app/" />
-<meta property="og:image" content="https://lumenshaders.vercel.app/assets/og.png" />
+<meta property="og:image" content="https://lumenshaders.vercel.app/assets/og.jpg" />
+<meta property="og:image:secure_url" content="https://lumenshaders.vercel.app/assets/og.jpg" />
+<meta property="og:image:type" content="image/jpeg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="LUMEN generative shader studio with reeded glass ember art" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:image" content="https://lumenshaders.vercel.app/assets/og.png" />
+<meta name="twitter:title" content="LUMEN, the generative shader studio" />
+<meta name="twitter:description" content="Looping abstract shader art in your browser. Randomize, fine-tune, share design codes and export PNG, video or GIF." />
+<meta name="twitter:image" content="https://lumenshaders.vercel.app/assets/og.jpg" />
 <link rel="canonical" href="https://lumenshaders.vercel.app/" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body class="booting">
 
 <header class="topbar">
   <div class="brand">
@@ -69,7 +76,10 @@
 <main class="app">
   <section class="stage" id="stage">
     <div class="canvas-frame" id="canvas-frame">
-      <canvas id="view"></canvas>
+      <div class="canvas-shell" id="canvas-shell">
+        <div class="canvas-boot" id="canvas-boot" aria-hidden="true"></div>
+        <canvas id="view"></canvas>
+      </div>
     </div>
     <div class="stage-meta">
       <div class="meta-left">
@@ -116,5 +126,9 @@
 <script src="js/modals.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
