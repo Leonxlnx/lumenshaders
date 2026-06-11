@@ -5,6 +5,7 @@ var Engine = (function () {
   var canvas, gl, program, uniforms = {};
   var playing = true;
   var suspended = false;
+  var started = false;
   var loopT = 0;            // seconds into current loop
   var lastTick = 0;
   var fps = 60, fpsAcc = 0, fpsN = 0, fpsCb = null;
@@ -32,13 +33,14 @@ var Engine = (function () {
     return sh;
   }
 
-  function init(canvasEl, paramsGetter) {
+  function init(canvasEl, paramsGetter, opts) {
+    opts = opts || {};
     canvas = canvasEl;
     getParams = paramsGetter;
     gl = canvas.getContext("webgl2", {
       antialias: false,
       preserveDrawingBuffer: true,
-      powerPreference: "high-performance"
+      powerPreference: "default"
     });
     if (!gl) throw new Error("WebGL2 not available");
 
@@ -61,6 +63,15 @@ var Engine = (function () {
       uniforms[n] = gl.getUniformLocation(program, n);
     });
 
+    lastTick = performance.now();
+    started = false;
+    if (opts.autostart) start();
+  }
+
+  function start() {
+    if (started) return;
+    started = true;
+    suspended = false;
     lastTick = performance.now();
     requestAnimationFrame(tick);
   }
@@ -168,6 +179,7 @@ var Engine = (function () {
 
   return {
     init: init,
+    start: start,
     setSize: setSize,
     renderAt: renderAt,
     readPixels: readPixels,

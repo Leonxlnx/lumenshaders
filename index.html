@@ -19,7 +19,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body class="booting">
 
 <header class="topbar">
   <div class="brand">
@@ -68,7 +68,10 @@
 <main class="app">
   <section class="stage" id="stage">
     <div class="canvas-frame" id="canvas-frame">
-      <canvas id="view"></canvas>
+      <div class="canvas-shell" id="canvas-shell">
+        <div class="canvas-boot" id="canvas-boot" aria-hidden="true"></div>
+        <canvas id="view"></canvas>
+      </div>
     </div>
     <div class="stage-meta">
       <div class="meta-left">
@@ -115,5 +118,9 @@
 <script src="js/modals.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
