@@ -1,6 +1,6 @@
 # LUMEN, the generative shader studio
 
-**[Try it live →](https://leonxlnx.github.io/lumenshaders/)**
+**[Try it live →](https://lumenshaders.vercel.app/)**
 
 A self-contained web tool that generates looping abstract shader art: liquid chrome, silk ribbons, soft gradient blooms, aura rings, light rays, halftone fields, data glyphs, reeded glass and pixel mosaics. Everything is rendered in real time with WebGL2 and every animation is a mathematically perfect loop.
 
@@ -14,7 +14,7 @@ A self-contained web tool that generates looping abstract shader art: liquid chr
 
 No build step, no dependencies.
 
-- **Live demo:** [leonxlnx.github.io/lumenshaders](https://leonxlnx.github.io/lumenshaders/)
+- **Live demo:** [lumenshaders.vercel.app](https://lumenshaders.vercel.app/)
 - **Local:** double-click `index.html`, or run `npx http-server . -p 8080`
 
 Requires a browser with WebGL2 (Chrome, Edge, Firefox).
@@ -33,7 +33,7 @@ Requires a browser with WebGL2 (Chrome, Edge, Firefox).
 - **Share**: every design serializes to a compact code (`LMN1.…`). Copy it, send it to anyone, and pasting it into the Share box recreates the exact design: style, colors, seed, all parameters. "Copy link" produces a URL that loads the design directly.
 - `Space` pauses, `S` saves a PNG.
 
-Full guide: [docs page](https://leonxlnx.github.io/lumenshaders/docs.html).
+Full guide: [docs page](https://lumenshaders.vercel.app/docs.html).
 
 ## Export
 
