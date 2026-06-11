@@ -179,6 +179,10 @@ vec3 sceneChrome(vec2 uv){
   col += alb2 * spec2 * u_light * 1.35;
   col += palette(clamp(fres*0.85 + u_irid*n.y*0.4, 0.0, 1.0)) * fres * u_light * 0.55;
   col += vec3(1.0) * pow(spec, 3.0) * u_light * 0.5;
+  /* clearcoat glass sheen on top of the metal */
+  float coat = pow(max(dot(n, normalize(vec3(0.0, 0.0, 1.0))), 0.0), 18.0);
+  col += vec3(1.0) * coat * u_light * 0.22;
+  col = mix(col, col + palette(fres*0.5)*0.08, fres*0.35);
   return col;
 }
 
@@ -383,19 +387,37 @@ vec3 boldField(vec2 p){
   return col;
 }
 
+vec3 sampleReeded(vec2 suv, float blur){
+  vec3 c0 = boldField(toP(suv)*0.8);
+  vec3 c1 = boldField(toP(suv + vec2(blur, blur*0.22))*0.8);
+  vec3 c2 = boldField(toP(suv - vec2(blur, blur*0.22))*0.8);
+  return c0*0.52 + c1*0.24 + c2*0.24;
+}
+
 vec3 sceneReeded(vec2 uv){
-  float nx = uv.x * u_lines*0.55;
+  float ridgeFreq = max(u_lines*0.55, 6.0);
+  float nx = uv.x * ridgeFreq;
   float ci = floor(nx);
-  float lx = fract(nx)-0.5;
+  float lx = fract(nx) - 0.5;
 
-  float srcX = (ci + 0.5 + lx*0.20 + sin(lx*PI)*0.34*u_warp) / (u_lines*0.55);
-  vec2 suv = vec2(srcX, uv.y);
-  vec3 col = boldField(toP(suv)*0.8);
+  /* lens refraction across each flute */
+  float lens = sin(lx*PI);
+  float refr = lx*0.28*u_warp + lens*0.11*u_warp;
+  float srcX = (ci + 0.5 + refr) / ridgeFreq;
+  float blur = 0.0035*u_soft*(0.6 + u_warp*0.5);
+  vec3 col = sampleReeded(vec2(srcX, uv.y), blur);
 
-  float shade = 0.86 + 0.26*cos(lx*PI);
-  float edge = smoothstep(0.5, 0.465, abs(lx));
-  col *= mix(0.62, shade, edge);
-  col += vec3(1.0)*pow(max(cos(lx*PI), 0.0), 30.0)*0.12*u_light;
+  float ridge = cos(lx*PI);
+  float shade = 0.74 + 0.30*ridge;
+  float groove = smoothstep(0.48, 0.40, abs(lx));
+  col *= mix(0.50, shade, groove);
+
+  /* fresnel rim + peak specular */
+  float fres = pow(1.0 - abs(ridge), 2.6);
+  float specPow = mix(10.0, 48.0, clamp(u_gloss/120.0, 0.0, 1.0));
+  float spec = pow(max(ridge, 0.0), specPow);
+  col += vec3(1.0)*spec*u_light*0.20;
+  col += mix(vec3(0.0), col*0.35 + vec3(0.06, 0.05, 0.04), fres*u_light*0.42);
   return col;
 }
 
@@ -452,9 +474,41 @@ float gnField(int ft, vec2 p){
     float v = gnVoro(p*1.4 + lt*0.8);
     return pow(clamp(v, 0.0, 1.0), 0.8 + u_g3.x*2.0);
   }
-  /* flow: fbm fed through itself */
-  float f1 = fbm(p + so + lt);
-  return fbm(p + 2.4*vec2(f1, fbm(p + so*1.3 - lt)) + so);
+  if (ft == 5) {                                  /* flow */
+    float f1 = fbm(p + so + lt);
+    return fbm(p + 2.4*vec2(f1, fbm(p + so*1.3 - lt)) + so);
+  }
+  if (ft == 6) {                                  /* cross bands */
+    float bx = sin(p.x*(2.2 + u_g3.x*4.5) + lt.x*2.0);
+    float by = cos(p.y*(1.6 + u_g3.x*3.2) - lt.y*2.0);
+    return bx*by*0.28 + 0.5 + fbm(p*0.25 + so)*0.08;
+  }
+  if (ft == 7) {                                  /* plaid grid */
+    vec2 q = p*(1.8 + u_g3.z*1.2);
+    float gx = step(0.5, fract(q.x + fbm(p*0.35 + so)*0.15));
+    float gy = step(0.5, fract(q.y + fbm(p.yx*0.35 - so)*0.15));
+    return mix(gx*gy, 1.0 - gx*gy, 0.5 + 0.5*sin(lt.x*3.0));
+  }
+  if (ft == 8) {                                  /* hex lattice edges */
+    float v = gnVoro(p*1.65 + lt*0.55);
+    return smoothstep(0.02, 0.20, v);
+  }
+  if (ft == 9) {                                  /* concentric arcs */
+    float a = atan(p.y, p.x) + lt.x*0.6;
+    float d = length(p);
+    return fract(sin(a*3.0 + u_seed*0.01)*0.5 + d*(0.75 + u_g3.x) + fbm(p*0.28 + so)*0.18);
+  }
+  if (ft == 10) {                                 /* hatch lines */
+    float h1 = sin((p.x + p.y)*(6.0 + u_g3.x*6.0) + lt.x);
+    float h2 = sin((p.x - p.y)*(6.0 + u_g3.x*6.0) - lt.y);
+    float hatch = smoothstep(-0.15, 0.55, h1*h2);
+    return mix(fbm(p*0.45 + so)*0.35, hatch, 0.72);
+  }
+  /* soft orb grid */
+  vec2 cell = fract(p*(0.85 + u_g3.z*0.8)) - 0.5;
+  float d = length(cell);
+  float pulse = sin(TAU*u_phase + hash21(floor(p*(0.85 + u_g3.z*0.8)))*6.28)*0.08;
+  return smoothstep(0.34 + pulse, 0.04, d);
 }
 
 vec2 gnDomain(int dop, vec2 p){
@@ -473,6 +527,19 @@ vec2 gnDomain(int dop, vec2 p){
   if (dop == 4) {                                 /* soft grid repeat */
     return (fract(p*0.5) - 0.5)*2.6;
   }
+  if (dop == 5) {                                 /* hex mirror */
+    float seg = TAU/6.0;
+    float a = atan(p.y, p.x);
+    a = abs(mod(a, seg) - seg*0.5);
+    return vec2(cos(a), sin(a))*length(p);
+  }
+  if (dop == 6) {                                 /* brick weave */
+    vec2 q = p*0.62;
+    vec2 cell = floor(q);
+    vec2 f = fract(q) - 0.5;
+    if (mod(cell.y, 2.0) > 0.5) f.x += 0.5;
+    return f*2.4;
+  }
   return p;
 }
 
@@ -486,6 +553,14 @@ vec3 gnColor(int cm, float t, vec2 p){
   if (cm == 3) {                                  /* duotone + highlight pop */
     vec3 c = mix(u_bg, u_c1, smoothstep(0.15, 0.75, t));
     return mix(c, u_c3, smoothstep(0.82, 0.98, t));
+  }
+  if (cm == 4) {                                  /* clean bands */
+    float bands = 4.0 + floor(u_g3.y*5.0);
+    return palette(floor(t*bands)/max(bands - 1.0, 1.0));
+  }
+  if (cm == 5) {                                  /* angular sweep */
+    float ang = atan(p.y, p.x)/PI*0.5 + 0.5;
+    return paletteCyc(mix(t, ang, 0.52));
   }
   return palette(t);
 }
@@ -522,8 +597,22 @@ vec3 sceneGenome(vec2 uv){
     col = mix(u_bg, col, 0.35);
     col += palette(clamp(f + 0.2, 0.0, 1.0)) * smoothstep(0.01, 0.14, g) * u_light * 1.4;
   } else if (sh == 3) {                           /* deep contrast carve */
-    col *= smoothstep(0.0, 0.55, f)*1.25;
+    col *= smoothstep(0.0, 0.55, f)*1.15;
     col = mix(u_bg, col, smoothstep(0.08, 0.35, f));
+  } else if (sh == 4) {                           /* glass refraction */
+    float e = 0.055;
+    float fx = gnField(ft, p + vec2(e, 0.0));
+    float fy = gnField(ft, p + vec2(0.0, e));
+    vec2 grad = vec2((fx - f)/e, (fy - f)/e);
+    vec2 pRef = p - grad*(0.12 + u_g1.z*0.22);
+    float f2 = gnField(ft, pRef);
+    col = gnColor(cm, f2*1.08 - 0.04, pRef);
+    float fres = pow(1.0 - clamp(length(grad)*1.8, 0.0, 1.0), 2.4);
+    float flute = 0.86 + 0.14*abs(sin(p0.x*u_lines*0.32 + p0.y*0.18));
+    col *= flute;
+    col += vec3(1.0)*fres*u_light*0.14;
+    float spec = pow(max(1.0 - abs(grad.x + grad.y)*0.5, 0.0), mix(8.0, 36.0, u_gloss/120.0));
+    col += vec3(1.0)*spec*u_light*0.18;
   }
 
   if (ov == 1) {                                  /* stripes */
@@ -534,6 +623,10 @@ vec3 sceneGenome(vec2 uv){
     col *= 0.78 + 0.22*smoothstep(0.42, 0.30, length(g));
   } else if (ov == 3) {                           /* scanlines */
     col *= 0.86 + 0.14*sin(uv.y*u_res.y*0.7 + f*3.0);
+  } else if (ov == 4) {                           /* fine weave */
+    float wx = sin(p0.x*28.0 + f*4.0);
+    float wy = sin(p0.y*28.0 - f*4.0);
+    col *= 0.90 + 0.10*smoothstep(-0.2, 0.5, wx*wy);
   }
 
   return col;

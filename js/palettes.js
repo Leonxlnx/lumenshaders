@@ -50,10 +50,10 @@ function generateRandomPalette(rand, tone) {
   var dark = tone === "dark";
   var colors = sch.map(function (off, i) {
     var hue = ((h + off) % 360 + 360) % 360;
-    var s = dark ? 0.75 + rand() * 0.25 : 0.55 + rand() * 0.35;
+    var s = dark ? 0.48 + rand() * 0.32 : 0.38 + rand() * 0.28;
     var l = dark
-      ? (i === 0 ? 0.52 : 0.28 + rand() * 0.45)
-      : (i === 0 ? 0.5 : 0.45 + rand() * 0.4);
+      ? (i === 0 ? 0.48 : 0.26 + rand() * 0.38)
+      : (i === 0 ? 0.46 : 0.42 + rand() * 0.34);
     return hslToHex(hue, s, l);
   });
   var bg = dark

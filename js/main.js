@@ -81,8 +81,19 @@ var RECIPES = {
     travel: [0.5, 1.1], loop: [5, 10] },
   mosaic: { tone: ["light", "dark"], cell: [40, 120], warp: [0.3, 1.2], scale: [0.8, 1.5],
     grain: [0, 0.04], contrast: [0.95, 1.15], sat: [0.95, 1.3], vig: [0, 0.15],
-    travel: [0.5, 1.2], loop: [5, 10], soft: [0.8, 1.4] }
+    travel: [0.5, 1.2], loop: [5, 10], soft: [0.8, 1.4] },
+  genome: { tone: ["dark", "light", "dark"], scale: [0.9, 1.7], complex: [2.5, 5.5], warp: [0.35, 1.3],
+    flow: [0.1, 0.8], stretch: [-0.2, 0.45], lines: [30, 100], cell: [50, 130],
+    grain: [0, 0.08], ca: [0, 0.15], vig: [0.05, 0.25], soft: [0.75, 1.35],
+    travel: [0.35, 0.95], loop: [4, 9] }
 };
+
+var FIELD_NAMES = ["FLUX", "RIDGE", "WAVE", "RING", "CELL", "FLOW", "BAND", "GRID", "HEX", "ARC", "HATCH", "ORB"];
+var FIELD_TYPES = FIELD_NAMES.length;
+var DOMAIN_TYPES = 7;
+var COLOR_MAPS = 6;
+var SHADE_TYPES = 5;
+var OVERLAY_TYPES = 5;
 
 var FORM_KEYS = ["scale", "complex", "warp", "flow", "stretch"];
 var LIGHT_KEYS = ["light", "gloss", "lightAngle", "irid", "glow", "contrast"];
@@ -94,9 +105,19 @@ var GRADE_KEYS = ["sat", "exposure"];
 
 function rnd() { return Math.random(); }
 function randIn(range) { return range[0] + rnd() * (range[1] - range[0]); }
+function recipeKey() {
+  if (P.genomeOn) return "genome";
+  return MODES[P.mode].key;
+}
+
 function rangeFor(key) {
-  var rec = RECIPES[MODES[P.mode].key] || {};
+  var rec = RECIPES[recipeKey()] || {};
   return rec[key] || DEF_RANGE[key];
+}
+
+function pickTone() {
+  var rec = RECIPES[recipeKey()] || { tone: ["dark", "light"] };
+  return rec.tone[Math.floor(rnd() * rec.tone.length)];
 }
 
 var activePreset = 3;   /* Ember — matches the startup design */
@@ -110,19 +131,58 @@ function applyPalette(pal, presetIdx) {
   setPresetActive(presetIdx);
 }
 
-function randomizePalette() {
-  var rec = RECIPES[MODES[P.mode].key] || { tone: ["dark", "light"] };
-  var tone = rec.tone[Math.floor(rnd() * rec.tone.length)];
-  if (rnd() < 0.25) {
-    applyPalette(generateRandomPalette(rnd, tone), -1);
-  } else {
+function randomizePalette(tone) {
+  tone = tone || pickTone();
+  if (rnd() < 0.78) {
     var pool = [];
     PALETTES.forEach(function (p, i) { if (p.tone === tone) pool.push(i); });
+    if (!pool.length) pool = PALETTES.map(function (_, i) { return i; });
     var idx = pool[Math.floor(rnd() * pool.length)];
     applyPalette(PALETTES[idx], idx);
+  } else {
+    applyPalette(generateRandomPalette(rnd, tone), -1);
   }
   P.hue = 0;
-  GRADE_KEYS.forEach(function (k) { P[k] = randIn(rangeFor(k)); });
+}
+
+/* tuned grading + lighting so random hits stay pleasant, not harsh */
+function smartTune(tone) {
+  var key = recipeKey();
+  var isLight = tone === "light";
+  var isGlass = key === "chrome" || key === "reeded" || key === "silk" ||
+    (P.genomeOn && Math.round(P.genes[5]) === 4);
+  var isSoft = key === "bloom" || key === "aura" || key === "mosaic" ||
+    key === "rays" || key === "halftone";
+
+  P.exposure = isLight ? randIn([0.94, 1.06]) : randIn([0.90, 1.04]);
+  P.contrast = isLight ? randIn([0.94, 1.10]) : randIn([0.92, 1.12]);
+  P.sat = isLight ? randIn([0.82, 1.06]) : randIn([0.86, 1.16]);
+  P.hue = randIn([-14, 14]);
+
+  if (isGlass) {
+    P.light = randIn([0.62, 1.32]);
+    P.gloss = Math.round(randIn([26, 92]));
+    P.lightAngle = Math.round(randIn([0, 360]));
+    P.irid = randIn([0, 0.38]);
+    P.glow = randIn([0, 0.2]);
+    P.soft = randIn([0.82, 1.28]);
+  } else if (isSoft) {
+    P.light = randIn([0.12, 0.72]);
+    P.gloss = Math.round(randIn([10, 44]));
+    P.lightAngle = Math.round(randIn([0, 360]));
+    P.irid = randIn([0, 0.22]);
+    P.glow = randIn([0, 0.18]);
+  } else {
+    P.light = randIn([0.48, 1.28]);
+    P.gloss = Math.round(randIn([14, 76]));
+    P.lightAngle = Math.round(randIn([0, 360]));
+    P.irid = randIn([0, 0.32]);
+    P.glow = randIn([0, 0.28]);
+  }
+
+  P.ca = randIn([0, 0.16]);
+  P.vig = randIn([0.05, 0.26]);
+  P.grain = randIn([0, isLight ? 0.055 : 0.085]);
 }
 
 function randomizeKeys(keys) {
@@ -139,19 +199,25 @@ function newSeed() { P.seed = Math.floor(rnd() * 10000); }
 /* genome: 12 genes define a complete standalone style that does not
    exist in the base set. fields x domains x colors x shading x overlays
    gives thousands of distinct archetypes. */
+function pickFieldType() {
+  /* mix organic noise fields with clean geometric patterns */
+  if (rnd() < 0.48) return 6 + Math.floor(rnd() * (FIELD_TYPES - 6));
+  return Math.floor(rnd() * 6);
+}
+
 function generateGenomeStyle() {
   P.genes = [
-    Math.floor(rnd() * 6),          // 0 field type
-    Math.floor(rnd() * 5),          // 1 domain op
-    rnd() * 1.6,                    // 2 extra warp
+    pickFieldType(),                // 0 field type
+    Math.floor(rnd() * DOMAIN_TYPES), // 1 domain op
+    0.15 + rnd() * 1.0,             // 2 extra warp
     2 + Math.floor(rnd() * 6),      // 3 fold count
-    Math.floor(rnd() * 4),          // 4 color map
-    Math.floor(rnd() * 4),          // 5 shading
-    Math.floor(rnd() * 4),          // 6 overlay
-    0.3 + rnd() * 1.2,              // 7 overlay scale
+    Math.floor(rnd() * COLOR_MAPS), // 4 color map
+    Math.floor(rnd() * SHADE_TYPES),// 5 shading
+    Math.floor(rnd() * OVERLAY_TYPES), // 6 overlay
+    0.25 + rnd() * 1.0,             // 7 overlay scale
     rnd(),                          // 8 ridge sharpness
     rnd(),                          // 9 poster steps
-    0.2 + rnd() * 0.9,              // 10 field scale
+    0.25 + rnd() * 0.85,            // 10 field scale
     rnd()                           // 11 rotation
   ];
   P.genomeOn = true;
@@ -162,8 +228,8 @@ function genomeName() {
   var g = P.genes;
   var n = (g[0] * 7 + g[1] * 13 + g[4] * 29 + g[5] * 47 + g[6] * 71 +
     Math.round(g[11] * 99)) % 1000;
-  var FIELD = ["FLUX", "RIDGE", "WAVE", "RING", "CELL", "FLOW"];
-  return FIELD[g[0]] + " " + String(Math.round(n)).padStart(3, "0");
+  var ft = Math.min(Math.max(Math.round(g[0]) || 0, 0), FIELD_TYPES - 1);
+  return FIELD_NAMES[ft] + " " + String(Math.round(n)).padStart(3, "0");
 }
 
 function styleName() {
@@ -175,7 +241,7 @@ function styleName() {
 
 function randomizeAll() {
   if (!P.lockStyle) {
-    if (rnd() < 0.35) {
+    if (rnd() < 0.42) {
       generateGenomeStyle();
     } else {
       P.synthOn = false;
@@ -183,8 +249,10 @@ function randomizeAll() {
       P.mode = Math.floor(rnd() * MODES.length);
     }
   }
-  randomizePalette();
-  randomizeKeys(FORM_KEYS.concat(LIGHT_KEYS, TEXTURE_KEYS, MOTION_KEYS));
+  var tone = pickTone();
+  randomizePalette(tone);
+  randomizeKeys(FORM_KEYS.concat(TEXTURE_KEYS, MOTION_KEYS));
+  smartTune(tone);
   newSeed();
   refreshAll();
 }
